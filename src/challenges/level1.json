@@ -1,0 +1,9 @@
+{
+  "title": "Soma Simples",
+  "description": "Implemente a função...",
+  "starterCode": "public class Solution { public static int sum(int a, int b) { return 0; } }",
+  "tests": [
+    { "input": [1, 2], "expected": 3 },
+    { "input": [5, -1], "expected": 4 }
+  ]
+}
