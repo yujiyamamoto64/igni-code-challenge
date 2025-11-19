@@ -1,5 +1,6 @@
 import * as monaco from "monaco-editor";
 import { useEffect, useRef } from "react";
+import { detectMissingImports } from "../editor/autoImports";
 
 const MATH_METHODS = [
   { label: "abs", documentation: "Valor absoluto de um número." },
@@ -40,6 +41,16 @@ export default function Editor({ code, onChange }) {
         preventLoopRef.current = false;
         return;
       }
+
+      const model = editor.getModel();
+      if (model) {
+        const missing = detectMissingImports(model.getValue());
+        if (missing.length > 0) {
+          insertImports(editor, missing);
+          return;
+        }
+      }
+
       lastSelectionRef.current = editor.getSelection();
       onChange(editor.getValue());
     });
@@ -228,6 +239,36 @@ function buildGeneralSuggestions(range) {
     ),
     keyword("Math", "java.lang.Math", "Funções matemáticas utilitárias."),
   ];
+}
+
+function insertImports(editor, imports) {
+  const model = editor.getModel();
+  if (!model || imports.length === 0) {
+    return;
+  }
+
+  const insertLine = findImportInsertLine(model);
+  const textToInsert = `${imports.join("\n")}\n\n`;
+  editor.executeEdits("auto-imports", [
+    {
+      range: new monaco.Range(insertLine, 1, insertLine, 1),
+      text: textToInsert,
+      forceMoveMarkers: true,
+    },
+  ]);
+}
+
+function findImportInsertLine(model) {
+  const lineCount = model.getLineCount();
+  let lineNumber = 1;
+  for (; lineNumber <= lineCount; lineNumber++) {
+    const content = model.getLineContent(lineNumber).trim();
+    if (content === "" || content.startsWith("import ")) {
+      continue;
+    }
+    break;
+  }
+  return lineNumber;
 }
 
 function adjustSelectionToModel(selection, model) {

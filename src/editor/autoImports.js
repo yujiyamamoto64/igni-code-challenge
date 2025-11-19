@@ -1,4 +1,4 @@
-const AUTO_IMPORTS = [
+export const AUTO_IMPORTS = [
   {
     statement: "import java.util.Objects;",
     always: true,
@@ -55,56 +55,25 @@ const AUTO_IMPORTS = [
 
 const AUTO_IMPORT_SET = new Set(AUTO_IMPORTS.map((entry) => entry.statement));
 
-export function applyAutoImports(rawCode = "") {
+export function detectMissingImports(rawCode = "") {
   const normalized = rawCode.replace(/\r\n/g, "\n");
-  const lines = normalized.split("\n");
-  const manualImports = [];
-  const otherLines = [];
+  const existingImports = new Set();
+  const importMatches = normalized.match(/^\s*import\s+.+?;\s*$/gm);
+  if (importMatches) {
+    importMatches.forEach((line) => {
+      existingImports.add(line.trim());
+    });
+  }
 
-  lines.forEach((line) => {
-    if (/^\s*import\s+/.test(line)) {
-      const trimmed = line.trim().replace(/\s+/g, " ").replace(/\s*;\s*$/, ";");
-      if (!AUTO_IMPORT_SET.has(trimmed)) {
-        manualImports.push(trimmed);
-      }
-    } else {
-      otherLines.push(line);
-    }
-  });
-
-  const bodyText = otherLines.join("\n");
-  const autoImportsToAdd = [];
+  const missingImports = [];
 
   AUTO_IMPORTS.forEach(({ statement, always, pattern }) => {
-    const shouldInclude = always || (pattern && pattern.test(bodyText));
-    if (shouldInclude && !autoImportsToAdd.includes(statement)) {
-      autoImportsToAdd.push(statement);
+    const shouldInclude = always || (pattern && pattern.test(normalized));
+    if (shouldInclude && !existingImports.has(statement)) {
+      missingImports.push(statement);
+      existingImports.add(statement);
     }
   });
 
-  const finalImports = [...manualImports];
-  autoImportsToAdd.forEach((importLine) => {
-    if (!finalImports.includes(importLine)) {
-      finalImports.push(importLine);
-    }
-  });
-
-  const trimmedBody = bodyText.replace(/^\s*\n/, "");
-  const sections = [];
-  if (finalImports.length > 0) {
-    sections.push(finalImports.join("\n"));
-  }
-  sections.push(trimmedBody);
-
-  return sections
-    .filter(Boolean)
-    .join("\n\n")
-    .replace(/\n{3,}/g, "\n\n");
-}
-
-export function listAutoImports(code) {
-  const normalized = code.replace(/\r\n/g, "\n");
-  const matches = normalized.match(/^\s*import\s+.+;/gm);
-  if (!matches) return [];
-  return matches.map((line) => line.trim());
+  return missingImports;
 }
