@@ -56,45 +56,42 @@ function buildRunnerSource(challenge) {
     throw new Error("Parametros do desafio nao encontrados.");
   }
 
-  const lines = [
-    "public class Main {",
-    "  public static void main(String[] args) {",
-    "    int passed = 0;",
-    `    int total = ${tests.length};`,
-  ];
+  const caseBlocks = tests
+    .map((test, index) =>
+      buildCaseBlock({ test, index, className, method })
+    )
+    .join("\n");
 
-  tests.forEach((test, index) => {
-    const block = buildCaseBlock({ test, index, className, method });
-    lines.push(...block);
-  });
+  return String.raw`
+public class Main {
+  public static void main(String[] args) {
+    int passed = 0;
+    int total = ${tests.length};
+${caseBlocks}
+    emitSummary(passed, total);
+  }
 
-  lines.push(
-    "    emitSummary(passed, total);",
-    "  }",
-    "",
-    "  private static void emitResult(int id, String status, String message) {",
-    '    System.out.println("{\\"type\\":\\"result\\",\\"id\\:" + id + ",\\"status\\":\\"" + status + "\\",\\"message\\":" + quote(message) + "}");',
-    "  }",
-    "",
-    "  private static void emitSummary(int passed, int total) {",
-    '    System.out.println("{\\"type\\":\\"summary\\",\\"passed\\:" + passed + ",\\"total\\:" + total + "}");',
-    "  }",
-    "",
-    "  private static String quote(String value) {",
-    "    if (value == null) {",
-    '      return "\"\"";',
-    "    }",
-    "    String escaped = value",
-    String.raw`      .replace("\\", "\\\\")`,
-    String.raw`      .replace("\"", "\\\"")`,
-    String.raw`      .replace("\n", "\\n")`,
-    String.raw`      .replace("\r", "\\r");`,
-    '    return "\"" + escaped + "\"";',
-    "  }",
-    "}"
-  );
+  private static void emitResult(int id, String status, String message) {
+    System.out.println("{\"type\":\"result\",\"id\":" + id + ",\"status\":\"" + status + "\",\"message\":" + quote(message) + "}");
+  }
 
-  return lines.join("\n");
+  private static void emitSummary(int passed, int total) {
+    System.out.println("{\"type\":\"summary\",\"passed\":" + passed + ",\"total\":" + total + "}");
+  }
+
+  private static String quote(String value) {
+    if (value == null) {
+      return "\"\"";
+    }
+    String escaped = value
+      .replace("\\", "\\\\")
+      .replace("\"", "\\\"")
+      .replace("\n", "\\n")
+      .replace("\r", "\\r");
+    return "\"" + escaped + "\"";
+  }
+}
+`.trim();
 }
 
 function buildCaseBlock({ test, index, className, method }) {
@@ -115,22 +112,23 @@ function buildCaseBlock({ test, index, className, method }) {
   const resultStr = toStringExpression(method.returnType, resultVar);
   const comparison = buildComparison(method.returnType, resultVar, expected);
 
-  return [
-    "    try {",
-    `      ${method.returnType} ${resultVar} = ${className}.${method.name}(${args.join(
-      ", "
-    )});`,
-    `      boolean ${passVar} = ${comparison};`,
-    `      if (${passVar}) {`,
-    "        passed++;",
-    "      }",
-    `      String message${index} = ${passVar} ? "Teste ${index + 1} passou" : "Esperado " + ${expectedStr} + ", mas foi " + ${resultStr};`,
-    `      emitResult(${index + 1}, ${passVar} ? "pass" : "fail", message${index});`,
-    "    } catch (Exception e) {",
-    `      emitResult(${index + 1}, "error", "Excecao: " + e.getMessage());`,
-    "    }",
-    "",
-  ];
+  return String.raw`
+    try {
+      ${method.returnType} ${resultVar} = ${className}.${method.name}(${args.join(
+        ", "
+      )});
+      boolean ${passVar} = ${comparison};
+      if (${passVar}) {
+        passed++;
+      }
+      String message${index} = ${passVar}
+          ? "Teste ${index + 1} passou"
+          : "Esperado " + ${expectedStr} + ", mas foi " + ${resultStr};
+      emitResult(${index + 1}, ${passVar} ? "pass" : "fail", message${index});
+    } catch (Exception e) {
+      emitResult(${index + 1}, "error", "Excecao: " + e.getMessage());
+    }
+`;
 }
 
 function sanitizeUserCode(code, className) {
