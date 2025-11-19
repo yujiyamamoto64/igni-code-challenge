@@ -1,12 +1,19 @@
 import * as monaco from "monaco-editor";
 import { useEffect, useRef } from "react";
 
-export default function Editor({
-  code,
-  onChange,
-  imports = [],
-  harnessDescription,
-}) {
+const MATH_METHODS = [
+  { label: "abs", documentation: "Valor absoluto de um número." },
+  { label: "max", documentation: "Retorna o maior entre dois valores." },
+  { label: "min", documentation: "Retorna o menor entre dois valores." },
+  { label: "pow", documentation: "Potência: base elevado ao expoente." },
+  { label: "sqrt", documentation: "Raiz quadrada." },
+  { label: "floor", documentation: "Maior inteiro menor ou igual ao valor." },
+  { label: "ceil", documentation: "Menor inteiro maior ou igual ao valor." },
+  { label: "round", documentation: "Arredonda para o inteiro mais próximo." },
+  { label: "random", documentation: "Número pseudo-aleatório entre 0 e 1." },
+];
+
+export default function Editor({ code, onChange }) {
   const containerRef = useRef(null);
   const editorRef = useRef(null);
   const preventLoopRef = useRef(false);
@@ -46,6 +53,11 @@ export default function Editor({
     const provider = monaco.languages.registerCompletionItemProvider("java", {
       triggerCharacters: [".", "("],
       provideCompletionItems(model, position) {
+        const mathContext = getMathContext(model, position);
+        if (mathContext) {
+          return { suggestions: buildMathSuggestions(mathContext.range) };
+        }
+
         const word = model.getWordUntilPosition(position);
         const range = {
           startLineNumber: position.lineNumber,
@@ -53,7 +65,7 @@ export default function Editor({
           endLineNumber: position.lineNumber,
           endColumn: word.endColumn,
         };
-        const suggestions = buildCompletionSuggestions(range);
+        const suggestions = buildGeneralSuggestions(range);
         return { suggestions };
       },
     });
@@ -72,27 +84,39 @@ export default function Editor({
     }
   }, [code]);
 
-  return (
-    <div className="flex flex-col h-full">
-      {imports.length > 0 && (
-        <div className="bg-zinc-900 border-b border-zinc-800 px-4 py-3">
-          <p className="text-xs uppercase text-zinc-500 tracking-wide">
-            Imports automáticos
-          </p>
-          <pre className="mt-1 text-sm text-zinc-200 font-mono">
-            {imports.join("\n")}
-          </pre>
-          {harnessDescription && (
-            <p className="mt-2 text-xs text-zinc-400">{harnessDescription}</p>
-          )}
-        </div>
-      )}
-      <div ref={containerRef} className="flex-1" />
-    </div>
-  );
+  return <div ref={containerRef} className="h-full w-full" />;
 }
 
-function buildCompletionSuggestions(range) {
+function getMathContext(model, position) {
+  const lineContent = model.getLineContent(position.lineNumber);
+  const textUntilPosition = lineContent.slice(0, position.column - 1);
+  const match = textUntilPosition.match(/Math\s*\.\s*([A-Za-z0-9_]*)$/);
+  if (!match) return null;
+
+  const partial = match[1] || "";
+  const startColumn = position.column - partial.length;
+  return {
+    range: {
+      startLineNumber: position.lineNumber,
+      startColumn,
+      endLineNumber: position.lineNumber,
+      endColumn: position.column,
+    },
+  };
+}
+
+function buildMathSuggestions(range) {
+  return MATH_METHODS.map(({ label, documentation }) => ({
+    label,
+    kind: monaco.languages.CompletionItemKind.Method,
+    insertText: `${label}($0)`,
+    detail: `Math.${label}`,
+    documentation,
+    range,
+  }));
+}
+
+function buildGeneralSuggestions(range) {
   const snippet = (label, insertText, detail, documentation) => ({
     label,
     kind: monaco.languages.CompletionItemKind.Snippet,
@@ -190,5 +214,6 @@ function buildCompletionSuggestions(range) {
       "java.lang.StringBuilder",
       "Classe para manipular strings de forma eficiente."
     ),
+    keyword("Math", "java.lang.Math", "Funções matemáticas utilitárias."),
   ];
 }

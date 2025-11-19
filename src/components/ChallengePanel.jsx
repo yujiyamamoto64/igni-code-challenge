@@ -5,7 +5,7 @@ function formatInput(input) {
   return JSON.stringify(input);
 }
 
-export default function ChallengePanel({ challenge }) {
+export default function ChallengePanel({ challenge, harnessDescription }) {
   return (
     <div className="p-4 bg-zinc-800 border-b border-zinc-700 space-y-4">
       <div>
@@ -42,6 +42,10 @@ export default function ChallengePanel({ challenge }) {
           </ul>
         </div>
       ) : null}
+
+      {harnessDescription && (
+        <p className="text-xs text-zinc-400 italic">{harnessDescription}</p>
+      )}
     </div>
   );
 }

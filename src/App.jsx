@@ -4,23 +4,29 @@ import ChallengePanel from "./components/ChallengePanel";
 import TestRunner from "./components/TestRunner";
 import challenges from "./challenges";
 import TopBar from "./components/TopBar";
-import {
-  JAVA_VERSION,
-  REQUIRED_IMPORTS,
-  HARNESS_DESCRIPTION,
-} from "./runtime/runtimeMetadata";
+import { applyAutoImports } from "./editor/autoImports";
+import { JAVA_VERSION, HARNESS_DESCRIPTION } from "./runtime/runtimeMetadata";
 
 export default function App() {
   const [challengeIndex, setChallengeIndex] = useState(0);
   const challenge = challenges[challengeIndex];
-  const [code, setCode] = useState(challenge.starterCode);
+  const [code, setCode] = useState(() =>
+    applyAutoImports(challenge.starterCode)
+  );
 
   useEffect(() => {
-    setCode(challenge.starterCode);
+    setCode(applyAutoImports(challenge.starterCode));
   }, [challenge]);
 
   function goToNextChallenge() {
     setChallengeIndex((prev) => (prev + 1) % challenges.length);
+  }
+
+  function handleCodeChange(value) {
+    const updated = applyAutoImports(value);
+    if (updated !== code) {
+      setCode(updated);
+    }
   }
 
   return (
@@ -31,14 +37,12 @@ export default function App() {
         challengeTitle={challenge.title}
       />
       <div className="grid grid-cols-2 flex-1">
-        <Editor
-          code={code}
-          onChange={setCode}
-          imports={REQUIRED_IMPORTS}
-          harnessDescription={HARNESS_DESCRIPTION}
-        />
+        <Editor code={code} onChange={handleCodeChange} />
         <div className="flex flex-col">
-          <ChallengePanel challenge={challenge} />
+          <ChallengePanel
+            challenge={challenge}
+            harnessDescription={HARNESS_DESCRIPTION}
+          />
           <TestRunner challenge={challenge} code={code} />
         </div>
       </div>

@@ -8,10 +8,14 @@ export default async function runJava(code, challenge) {
   const runnerSource = buildRunnerSource(challenge);
   const sanitizedUserCode = sanitizeUserCode(code, challenge.className);
   const solutionWithHarness = injectHarnessEntryPoint(sanitizedUserCode);
+  const normalizedSolution = solutionWithHarness.trim();
+  const needsObjectsImport = !/import\s+java\.util\.Objects\s*;/.test(
+    normalizedSolution
+  );
   const combinedSource = [
-    "import java.util.Objects;",
+    needsObjectsImport ? "import java.util.Objects;" : "",
     "",
-    solutionWithHarness.trim(),
+    normalizedSolution,
     "",
     runnerSource,
   ]
