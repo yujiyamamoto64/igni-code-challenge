@@ -1,5 +1,6 @@
+import { JAVA_VERSION } from "./runtimeMetadata";
+
 const API_URL = "https://emkc.org/api/v2/piston/execute";
-const JAVA_VERSION = "15.0.2";
 
 export default async function runJava(code, challenge) {
   guardAgainstCustomMain(code);
