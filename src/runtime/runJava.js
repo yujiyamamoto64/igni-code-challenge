@@ -2,12 +2,15 @@ const API_URL = "https://emkc.org/api/v2/piston/execute";
 const JAVA_VERSION = "15.0.2";
 
 export default async function runJava(code, challenge) {
+  guardAgainstCustomMain(code);
+
   const runnerSource = buildRunnerSource(challenge);
   const sanitizedUserCode = sanitizeUserCode(code, challenge.className);
+  const solutionWithHarness = injectHarnessEntryPoint(sanitizedUserCode);
   const combinedSource = [
     "import java.util.Objects;",
     "",
-    sanitizedUserCode.trim(),
+    solutionWithHarness.trim(),
     "",
     runnerSource,
   ]
@@ -63,8 +66,8 @@ function buildRunnerSource(challenge) {
     .join("\n");
 
   return String.raw`
-public class Main {
-  public static void main(String[] args) {
+class SolutionTestHarness {
+  public static void run() {
     int passed = 0;
     int total = ${tests.length};
 ${caseBlocks}
@@ -142,6 +145,32 @@ function sanitizeUserCode(code, className) {
   }
 
   return code;
+}
+
+function injectHarnessEntryPoint(code) {
+  const trimmedCode = code.trim();
+  const closingBraceIndex = trimmedCode.lastIndexOf("}");
+  if (closingBraceIndex === -1) {
+    throw new Error("Nao foi possivel interpretar a classe Solution.");
+  }
+
+  const before = trimmedCode.slice(0, closingBraceIndex);
+  const after = trimmedCode.slice(closingBraceIndex);
+  const harnessMain = `
+  public static void main(String[] args) {
+    SolutionTestHarness.run();
+  }
+`;
+
+  return `${before}\n${harnessMain}\n${after}`;
+}
+
+function guardAgainstCustomMain(code) {
+  if (/public\s+static\s+void\s+main\s*\(/i.test(code)) {
+    throw new Error(
+      "Remova o método main. O avaliador já cria um main automaticamente para rodar os testes."
+    );
+  }
 }
 
 function formatLiteral(type, value) {
