@@ -17,6 +17,7 @@ export default function Editor({ code, onChange }) {
   const containerRef = useRef(null);
   const editorRef = useRef(null);
   const preventLoopRef = useRef(false);
+  const lastSelectionRef = useRef(null);
 
   useEffect(() => {
     if (!containerRef.current || editorRef.current) {
@@ -39,6 +40,7 @@ export default function Editor({ code, onChange }) {
         preventLoopRef.current = false;
         return;
       }
+      lastSelectionRef.current = editor.getSelection();
       onChange(editor.getValue());
     });
 
@@ -80,7 +82,17 @@ export default function Editor({ code, onChange }) {
     const currentValue = editor.getValue();
     if (currentValue !== code) {
       preventLoopRef.current = true;
+      const currentSelection =
+        lastSelectionRef.current || editor.getSelection();
       editor.setValue(code);
+      if (currentSelection) {
+        const model = editor.getModel();
+        if (model) {
+          const adjusted = adjustSelectionToModel(currentSelection, model);
+          editor.setSelection(adjusted);
+        }
+      }
+      editor.focus();
     }
   }, [code]);
 
@@ -216,4 +228,25 @@ function buildGeneralSuggestions(range) {
     ),
     keyword("Math", "java.lang.Math", "Funções matemáticas utilitárias."),
   ];
+}
+
+function adjustSelectionToModel(selection, model) {
+  const clampPosition = (position) => {
+    const lineNumber = Math.min(
+      Math.max(position.lineNumber, 1),
+      model.getLineCount()
+    );
+    const lineMaxColumn = model.getLineMaxColumn(lineNumber);
+    const column = Math.min(Math.max(position.column, 1), lineMaxColumn);
+    return { lineNumber, column };
+  };
+
+  const start = clampPosition(selection.getStartPosition());
+  const end = clampPosition(selection.getEndPosition());
+  return new monaco.Selection(
+    start.lineNumber,
+    start.column,
+    end.lineNumber,
+    end.column
+  );
 }
