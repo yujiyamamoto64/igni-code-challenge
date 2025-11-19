@@ -3,13 +3,21 @@ const JAVA_VERSION = "15.0.2";
 
 export default async function runJava(code, challenge) {
   const runnerSource = buildRunnerSource(challenge);
+  const sanitizedUserCode = sanitizeUserCode(code, challenge.className);
+  const combinedSource = [
+    "import java.util.Objects;",
+    "",
+    sanitizedUserCode.trim(),
+    "",
+    runnerSource,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
   const payload = {
     language: "java",
     version: JAVA_VERSION,
-    files: [
-      { name: `${challenge.className}.java`, content: code },
-      { name: "Main.java", content: runnerSource },
-    ],
+    files: [{ name: "Main.java", content: combinedSource }],
   };
 
   const response = await fetch(API_URL, {
@@ -49,8 +57,6 @@ function buildRunnerSource(challenge) {
   }
 
   const lines = [
-    "import java.util.Objects;",
-    "",
     "public class Main {",
     "  public static void main(String[] args) {",
     "    int passed = 0;",
@@ -125,6 +131,19 @@ function buildCaseBlock({ test, index, className, method }) {
     "    }",
     "",
   ];
+}
+
+function sanitizeUserCode(code, className) {
+  if (!code || !className) {
+    return code || "";
+  }
+
+  const classRegex = new RegExp(`public\\s+class\\s+${className}\\b`);
+  if (classRegex.test(code)) {
+    return code.replace(classRegex, `class ${className}`);
+  }
+
+  return code;
 }
 
 function formatLiteral(type, value) {
