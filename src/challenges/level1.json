@@ -1,7 +1,16 @@
 {
   "title": "Soma Simples",
-  "description": "Implemente a função...",
-  "starterCode": "public class Solution { public static int sum(int a, int b) { return 0; } }",
+  "description": "Implemente a funcao sum que recebe dois inteiros e retorna o resultado da soma.",
+  "starterCode": "public class Solution {\n  public static int sum(int a, int b) {\n    // Escreva seu codigo aqui\n    return 0;\n  }\n}\n",
+  "className": "Solution",
+  "method": {
+    "name": "sum",
+    "returnType": "int",
+    "parameters": [
+      { "name": "a", "type": "int" },
+      { "name": "b", "type": "int" }
+    ]
+  },
   "tests": [
     { "input": [1, 2], "expected": 3 },
     { "input": [5, -1], "expected": 4 }

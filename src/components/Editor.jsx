@@ -1,22 +1,52 @@
 import * as monaco from "monaco-editor";
 import { useEffect, useRef } from "react";
 
-export default function Editor({ initialCode }) {
+export default function Editor({ code, onChange }) {
+  const containerRef = useRef(null);
   const editorRef = useRef(null);
+  const preventLoopRef = useRef(false);
 
   useEffect(() => {
-    if (!editorRef.current) {
-      editorRef.current = monaco.editor.create(
-        document.getElementById("editor-container"),
-        {
-          value: initialCode,
-          language: "java",
-          theme: "vs-dark",
-          fontSize: 16,
-        }
-      );
+    if (!containerRef.current || editorRef.current) {
+      return;
     }
-  }, []);
 
-  return <div id="editor-container" className="h-full w-full" />;
+    const editor = monaco.editor.create(containerRef.current, {
+      value: code,
+      language: "java",
+      theme: "vs-dark",
+      fontSize: 16,
+      automaticLayout: true,
+      minimap: { enabled: false },
+    });
+
+    editorRef.current = editor;
+
+    const subscription = editor.onDidChangeModelContent(() => {
+      if (preventLoopRef.current) {
+        preventLoopRef.current = false;
+        return;
+      }
+      onChange(editor.getValue());
+    });
+
+    return () => {
+      subscription.dispose();
+      editor.dispose();
+      editorRef.current = null;
+    };
+  }, [onChange]);
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const currentValue = editor.getValue();
+    if (currentValue !== code) {
+      preventLoopRef.current = true;
+      editor.setValue(code);
+    }
+  }, [code]);
+
+  return <div ref={containerRef} className="h-full w-full" />;
 }
