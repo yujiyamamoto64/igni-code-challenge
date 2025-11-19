@@ -1,0 +1,19 @@
+{
+  "title": "Diferença Absoluta",
+  "description": "Implemente a função difference que recebe dois inteiros e retorna a diferença absoluta entre eles.",
+  "starterCode": "public class Solution {\n  public static int difference(int a, int b) {\n    // Escreva seu codigo aqui\n    return 0;\n  }\n}\n",
+  "className": "Solution",
+  "method": {
+    "name": "difference",
+    "returnType": "int",
+    "parameters": [
+      { "name": "a", "type": "int" },
+      { "name": "b", "type": "int" }
+    ]
+  },
+  "tests": [
+    { "input": [5, 2], "expected": 3 },
+    { "input": [-2, 6], "expected": 8 },
+    { "input": [0, 0], "expected": 0 }
+  ]
+}
