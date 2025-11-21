@@ -337,6 +337,10 @@ export default function Editor({ code, onChange }) {
           return { suggestions: buildMathSuggestions(mathContext.range) };
         }
 
+        if (isPropertyAccess(model, position)) {
+          return { suggestions: [] };
+        }
+
         const word = model.getWordUntilPosition(position);
         const range = {
           startLineNumber: position.lineNumber,
@@ -392,6 +396,12 @@ function getMathContext(model, position) {
       endColumn: position.column,
     },
   };
+}
+
+function isPropertyAccess(model, position) {
+  const lineContent = model.getLineContent(position.lineNumber);
+  const textUntilPosition = lineContent.slice(0, position.column - 1);
+  return /\.\s*[A-Za-z0-9_]*$/.test(textUntilPosition);
 }
 
 function buildMathSuggestions(range) {
