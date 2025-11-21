@@ -12,12 +12,24 @@ export const AUTO_IMPORTS = [
     pattern: /\bArrayList\b/,
   },
   {
+    statement: "import java.util.LinkedList;",
+    pattern: /\bLinkedList\b/,
+  },
+  {
     statement: "import java.util.Map;",
     pattern: /\bMap\b/,
   },
   {
     statement: "import java.util.HashMap;",
     pattern: /\bHashMap\b/,
+  },
+  {
+    statement: "import java.util.LinkedHashMap;",
+    pattern: /\bLinkedHashMap\b/,
+  },
+  {
+    statement: "import java.util.TreeMap;",
+    pattern: /\bTreeMap\b/,
   },
   {
     statement: "import java.util.Set;",
@@ -28,8 +40,44 @@ export const AUTO_IMPORTS = [
     pattern: /\bHashSet\b/,
   },
   {
+    statement: "import java.util.TreeSet;",
+    pattern: /\bTreeSet\b/,
+  },
+  {
+    statement: "import java.util.Queue;",
+    pattern: /\bQueue\b/,
+  },
+  {
+    statement: "import java.util.Deque;",
+    pattern: /\bDeque\b/,
+  },
+  {
+    statement: "import java.util.ArrayDeque;",
+    pattern: /\bArrayDeque\b/,
+  },
+  {
+    statement: "import java.util.Stack;",
+    pattern: /\bStack\b/,
+  },
+  {
+    statement: "import java.util.PriorityQueue;",
+    pattern: /\bPriorityQueue\b/,
+  },
+  {
+    statement: "import java.util.Collections;",
+    pattern: /\bCollections\b/,
+  },
+  {
+    statement: "import java.util.Arrays;",
+    pattern: /\bArrays\b/,
+  },
+  {
     statement: "import java.util.Optional;",
     pattern: /\bOptional\b/,
+  },
+  {
+    statement: "import java.util.BitSet;",
+    pattern: /\bBitSet\b/,
   },
   {
     statement: "import java.util.stream.Collectors;",
@@ -38,6 +86,34 @@ export const AUTO_IMPORTS = [
   {
     statement: "import java.util.stream.Stream;",
     pattern: /\bStream\b/,
+  },
+  {
+    statement: "import java.util.regex.Pattern;",
+    pattern: /\bPattern\b/,
+  },
+  {
+    statement: "import java.util.regex.Matcher;",
+    pattern: /\bMatcher\b/,
+  },
+  {
+    statement: "import java.io.BufferedReader;",
+    pattern: /\bBufferedReader\b/,
+  },
+  {
+    statement: "import java.io.InputStreamReader;",
+    pattern: /\bInputStreamReader\b/,
+  },
+  {
+    statement: "import java.io.PrintWriter;",
+    pattern: /\bPrintWriter\b/,
+  },
+  {
+    statement: "import java.util.StringTokenizer;",
+    pattern: /\bStringTokenizer\b/,
+  },
+  {
+    statement: "import java.util.Scanner;",
+    pattern: /\bScanner\b/,
   },
   {
     statement: "import java.math.BigDecimal;",
@@ -50,6 +126,26 @@ export const AUTO_IMPORTS = [
   {
     statement: "import java.lang.Math;",
     pattern: /\bMath\s*\./,
+  },
+  {
+    statement: "import java.time.LocalDate;",
+    pattern: /\bLocalDate\b/,
+  },
+  {
+    statement: "import java.time.LocalTime;",
+    pattern: /\bLocalTime\b/,
+  },
+  {
+    statement: "import java.time.LocalDateTime;",
+    pattern: /\bLocalDateTime\b/,
+  },
+  {
+    statement: "import java.time.Duration;",
+    pattern: /\bDuration\b/,
+  },
+  {
+    statement: "import java.time.Period;",
+    pattern: /\bPeriod\b/,
   },
 ];
 
