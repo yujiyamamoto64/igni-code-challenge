@@ -563,14 +563,17 @@ function buildSuggestionsForKind(kind, range) {
         range
       );
     case "numberObject":
+    case "primitiveNumber":
       return buildMethodSuggestions(NUMBER_METHODS, "java.lang.Number", range);
     case "booleanObject":
+    case "primitiveBoolean":
       return buildMethodSuggestions(
         BOOLEAN_METHODS,
         "java.lang.Boolean",
         range
       );
     case "charObject":
+    case "primitiveChar":
       return buildMethodSuggestions(
         CHAR_METHODS,
         "java.lang.Character",
@@ -592,14 +595,17 @@ function buildElementSuggestions(elementKind, range) {
         range
       );
     case "numberObject":
+    case "primitiveNumber":
       return buildMethodSuggestions(NUMBER_METHODS, "java.lang.Number", range);
     case "booleanObject":
+    case "primitiveBoolean":
       return buildMethodSuggestions(
         BOOLEAN_METHODS,
         "java.lang.Boolean",
         range
       );
     case "charObject":
+    case "primitiveChar":
       return buildMethodSuggestions(
         CHAR_METHODS,
         "java.lang.Character",
