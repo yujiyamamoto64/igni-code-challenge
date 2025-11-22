@@ -340,8 +340,8 @@ export default function Editor({ code, onChange }) {
 
         const propertyContext = getPropertyContext(model, position);
         if (propertyContext) {
-          const { variable, partial } = propertyContext;
-          const inferredType = inferTypeForVariable(model, variable);
+          const { baseVariable, isArrayElement, partial } = propertyContext;
+          const typeInfo = inferTypeInfo(model, baseVariable);
           const range = {
             startLineNumber: position.lineNumber,
             startColumn: position.column - partial.length,
@@ -349,11 +349,19 @@ export default function Editor({ code, onChange }) {
             endColumn: position.column,
           };
 
-          if (inferredType === "list") {
-            return { suggestions: buildListMethodSuggestions(range) };
+          if (!typeInfo) {
+            return { suggestions: [] };
           }
 
-          return { suggestions: [] };
+          if (isArrayElement) {
+            const elementKind = typeInfo.elementKind;
+            if (!elementKind || elementKind === "primitiveNumber") {
+              return { suggestions: [] };
+            }
+            return { suggestions: buildElementSuggestions(elementKind, range) };
+          }
+
+          return { suggestions: buildSuggestionsForKind(typeInfo.kind, range) };
         }
 
         const word = model.getWordUntilPosition(position);
@@ -417,10 +425,17 @@ function getPropertyContext(model, position) {
   const lineContent = model.getLineContent(position.lineNumber);
   const textUntilPosition = lineContent.slice(0, position.column - 1);
   const match = textUntilPosition.match(
-    /([A-Za-z_][A-Za-z0-9_]*)\s*\.\s*([A-Za-z0-9_]*)$/
+    /([A-Za-z_][A-Za-z0-9_]*\s*(?:\[[^\]]*\])?)\s*\.\s*([A-Za-z0-9_]*)$/
   );
   if (!match) return null;
-  return { variable: match[1], partial: match[2] || "" };
+
+  const expression = match[1].trim();
+  const partial = match[2] || "";
+  const indexMatch = expression.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*\[/);
+  const baseVariable = indexMatch ? indexMatch[1] : expression;
+  const isArrayElement = Boolean(indexMatch);
+
+  return { baseVariable, isArrayElement, partial };
 }
 
 function buildMathSuggestions(range) {
@@ -442,15 +457,109 @@ function buildGeneralSuggestions(range) {
   ];
 }
 
-function buildListMethodSuggestions(range) {
-  return LIST_METHODS.map(({ label, documentation }) => ({
-    label,
-    kind: monaco.languages.CompletionItemKind.Method,
-    insertText: `${label}($0)`,
-    detail: "java.util.List",
-    documentation,
-    range,
-  }));
+function buildMethodSuggestions(methods, detail, range) {
+  return methods.map((method) => {
+    const insertText =
+      method.insertText ?? `${method.label}${method.noParens ? "" : "($0)"}`;
+    const isSnippet = insertText.includes("$");
+    const item = {
+      label: method.label,
+      kind: method.kind ?? monaco.languages.CompletionItemKind.Method,
+      insertText,
+      detail,
+      documentation: method.documentation,
+      range,
+    };
+    if (isSnippet) {
+      item.insertTextRules =
+        monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet;
+    }
+    return item;
+  });
+}
+
+function buildSuggestionsForKind(kind, range) {
+  switch (kind) {
+    case "list":
+      return buildMethodSuggestions(LIST_METHODS, "java.util.List", range);
+    case "map":
+      return buildMethodSuggestions(MAP_METHODS, "java.util.Map", range);
+    case "set":
+      return buildMethodSuggestions(SET_METHODS, "java.util.Set", range);
+    case "queue":
+      return buildMethodSuggestions(QUEUE_METHODS, "java.util.Queue", range);
+    case "deque":
+      return buildMethodSuggestions(DEQUE_METHODS, "java.util.Deque", range);
+    case "stack":
+      return buildMethodSuggestions(STACK_METHODS, "java.util.Stack", range);
+    case "priorityQueue":
+      return buildMethodSuggestions(
+        PRIORITY_QUEUE_METHODS,
+        "java.util.PriorityQueue",
+        range
+      );
+    case "array":
+      return buildMethodSuggestions(ARRAY_METHODS, "Array", range);
+    case "string":
+      return buildMethodSuggestions(STRING_METHODS, "java.lang.String", range);
+    case "stringBuilder":
+      return buildMethodSuggestions(
+        STRING_BUILDER_METHODS,
+        "java.lang.StringBuilder",
+        range
+      );
+    case "optional":
+      return buildMethodSuggestions(
+        OPTIONAL_METHODS,
+        "java.util.Optional",
+        range
+      );
+    case "numberObject":
+      return buildMethodSuggestions(NUMBER_METHODS, "java.lang.Number", range);
+    case "booleanObject":
+      return buildMethodSuggestions(
+        BOOLEAN_METHODS,
+        "java.lang.Boolean",
+        range
+      );
+    case "charObject":
+      return buildMethodSuggestions(
+        CHAR_METHODS,
+        "java.lang.Character",
+        range
+      );
+    default:
+      return [];
+  }
+}
+
+function buildElementSuggestions(elementKind, range) {
+  switch (elementKind) {
+    case "string":
+      return buildMethodSuggestions(STRING_METHODS, "java.lang.String", range);
+    case "stringBuilder":
+      return buildMethodSuggestions(
+        STRING_BUILDER_METHODS,
+        "java.lang.StringBuilder",
+        range
+      );
+    case "numberObject":
+      return buildMethodSuggestions(NUMBER_METHODS, "java.lang.Number", range);
+    case "booleanObject":
+      return buildMethodSuggestions(
+        BOOLEAN_METHODS,
+        "java.lang.Boolean",
+        range
+      );
+    case "charObject":
+      return buildMethodSuggestions(
+        CHAR_METHODS,
+        "java.lang.Character",
+        range
+      );
+    default:
+      return [];
+  }
 }
 
 function insertImports(editor, imports) {
@@ -483,21 +592,90 @@ function findImportInsertLine(model) {
   return lineNumber;
 }
 
-function inferTypeForVariable(model, variableName) {
+function inferTypeInfo(model, variableName) {
   const text = model.getValue();
   const escaped = escapeRegExp(variableName);
-  const listTypePattern = new RegExp(
-    `\\b(List|ArrayList|LinkedList)\\s*(<[^;\\n>]*>)?\\s+${escaped}\\b`
-  );
-  const listNewPattern = new RegExp(
-    `${escaped}\\s*=\\s*new\\s+(ArrayList|LinkedList)\\b`
-  );
 
-  if (listTypePattern.test(text) || listNewPattern.test(text)) {
-    return "list";
+  // Arrays (Type[] name or Type name[])
+  const arrayTypePattern = new RegExp(
+    `\\b([A-Za-z_][A-Za-z0-9_<>?,\\s]*)\\s*\\[\\s*\\]\\s+${escaped}\\b`
+  );
+  const arrayTypePatternAlt = new RegExp(
+    `\\b([A-Za-z_][A-Za-z0-9_<>?,\\s]*)\\s+${escaped}\\s*\\[\\s*\\]`
+  );
+  const arrayNewPattern = new RegExp(
+    `${escaped}\\s*=\\s*new\\s+([A-Za-z_][A-Za-z0-9_<>?,\\s]*)\\s*\\[`
+  );
+  const arrayMatch =
+    text.match(arrayTypePattern) ||
+    text.match(arrayTypePatternAlt) ||
+    text.match(arrayNewPattern);
+  if (arrayMatch) {
+    const elementType = normalizeTypeName(arrayMatch[1]);
+    return { kind: "array", elementKind: mapBaseTypeToKind(elementType) };
+  }
+
+  // Generic types (List<String> list)
+  const genericDecl = new RegExp(
+    `\\b([A-Za-z_][A-Za-z0-9_]*)\\s*<[^;>]*>\\s+${escaped}\\b`
+  );
+  const genericMatch = text.match(genericDecl);
+  if (genericMatch) {
+    const baseType = normalizeTypeName(genericMatch[1]);
+    const kind = mapBaseTypeToKind(baseType);
+    if (kind) return { kind };
+  }
+
+  // Simple declarations (Type var;)
+  const simpleDecl = new RegExp(
+    `\\b([A-Za-z_][A-Za-z0-9_]*)\\s+${escaped}\\b`
+  );
+  const simpleMatch = text.match(simpleDecl);
+  if (simpleMatch) {
+    const baseType = normalizeTypeName(simpleMatch[1]);
+    const kind = mapBaseTypeToKind(baseType);
+    if (kind) return { kind };
+  }
+
+  // Assignment with new (var = new Type())
+  const newAssign = new RegExp(
+    `${escaped}\\s*=\\s*new\\s+([A-Za-z_][A-Za-z0-9_]*)`
+  );
+  const newAssignMatch = text.match(newAssign);
+  if (newAssignMatch) {
+    const baseType = normalizeTypeName(newAssignMatch[1]);
+    const kind = mapBaseTypeToKind(baseType);
+    if (kind) return { kind };
   }
 
   return null;
+}
+
+function mapBaseTypeToKind(typeName) {
+  const base = typeName.replace(/\s+/g, "").split(".").pop();
+  if (["List", "ArrayList", "LinkedList"].includes(base)) return "list";
+  if (["Map", "HashMap", "TreeMap", "LinkedHashMap"].includes(base)) return "map";
+  if (["Set", "HashSet", "TreeSet"].includes(base)) return "set";
+  if (["Queue"].includes(base)) return "queue";
+  if (["Deque", "ArrayDeque"].includes(base)) return "deque";
+  if (["Stack"].includes(base)) return "stack";
+  if (["PriorityQueue"].includes(base)) return "priorityQueue";
+  if (["Optional"].includes(base)) return "optional";
+  if (base === "String") return "string";
+  if (base === "StringBuilder") return "stringBuilder";
+  if (["Integer", "Long", "Double", "Float", "Short", "Byte"].includes(base))
+    return "numberObject";
+  if (base === "Boolean") return "booleanObject";
+  if (["Character", "Char"].includes(base)) return "charObject";
+  if (["int", "long", "double", "float", "short", "byte"].includes(base))
+    return "primitiveNumber";
+  if (base === "boolean") return "primitiveBoolean";
+  if (base === "char") return "primitiveChar";
+  return null;
+}
+
+function normalizeTypeName(typeName) {
+  return typeName.replace(/<.*?>/g, "").replace(/\s+/g, "");
 }
 
 function escapeRegExp(value) {
@@ -529,6 +707,175 @@ const LIST_METHODS = [
   { label: "iterator", documentation: "Retorna um Iterator." },
   { label: "listIterator", documentation: "Retorna um ListIterator." },
   { label: "stream", documentation: "Retorna um Stream." },
+];
+
+const MAP_METHODS = [
+  { label: "put", documentation: "Adiciona ou substitui valor pela chave." },
+  { label: "putIfAbsent", documentation: "Adiciona apenas se chave ausente." },
+  { label: "get", documentation: "Obtém valor pela chave." },
+  { label: "getOrDefault", documentation: "Valor ou padrao se chave ausente." },
+  { label: "containsKey", documentation: "Verifica existencia da chave." },
+  { label: "containsValue", documentation: "Verifica existencia do valor." },
+  { label: "remove", documentation: "Remove par pela chave." },
+  { label: "computeIfAbsent", documentation: "Calcula valor se chave ausente." },
+  { label: "computeIfPresent", documentation: "Recalcula valor se presente." },
+  { label: "merge", documentation: "Combina valor existente com novo." },
+  { label: "size", documentation: "Quantidade de pares." },
+  { label: "isEmpty", documentation: "Indica se o mapa esta vazio." },
+  { label: "clear", documentation: "Remove todos os pares." },
+  { label: "keySet", documentation: "Retorna conjunto de chaves." },
+  { label: "values", documentation: "Retorna colecao de valores." },
+  { label: "entrySet", documentation: "Retorna conjunto de entradas." },
+];
+
+const SET_METHODS = [
+  { label: "add", documentation: "Adiciona elemento ao conjunto." },
+  { label: "addAll", documentation: "Adiciona todos de outra colecao." },
+  { label: "contains", documentation: "Verifica se contem elemento." },
+  { label: "remove", documentation: "Remove elemento se existir." },
+  { label: "removeIf", documentation: "Remove se predicado for verdadeiro." },
+  { label: "size", documentation: "Quantidade de elementos." },
+  { label: "isEmpty", documentation: "Indica se o conjunto esta vazio." },
+  { label: "clear", documentation: "Remove todos os elementos." },
+  { label: "iterator", documentation: "Iterador sobre os elementos." },
+  { label: "stream", documentation: "Cria um Stream." },
+];
+
+const QUEUE_METHODS = [
+  { label: "offer", documentation: "Enfileira se houver capacidade." },
+  { label: "add", documentation: "Enfileira ou lança excecao se cheio." },
+  { label: "poll", documentation: "Desenfileira ou null se vazio." },
+  { label: "remove", documentation: "Desenfileira ou lança excecao." },
+  { label: "peek", documentation: "Olha proximo sem remover; null se vazio." },
+  { label: "element", documentation: "Olha proximo ou lança excecao." },
+  { label: "size", documentation: "Quantidade de elementos." },
+  { label: "isEmpty", documentation: "Indica se esta vazio." },
+  { label: "clear", documentation: "Remove todos os elementos." },
+];
+
+const DEQUE_METHODS = [
+  { label: "addFirst", documentation: "Adiciona no inicio." },
+  { label: "addLast", documentation: "Adiciona no fim." },
+  { label: "offerFirst", documentation: "Enfileira no inicio se possivel." },
+  { label: "offerLast", documentation: "Enfileira no fim se possivel." },
+  { label: "pollFirst", documentation: "Remove do inicio ou null." },
+  { label: "pollLast", documentation: "Remove do fim ou null." },
+  { label: "peekFirst", documentation: "Olha inicio ou null." },
+  { label: "peekLast", documentation: "Olha fim ou null." },
+  { label: "push", documentation: "Empilha no topo (inicio)." },
+  { label: "pop", documentation: "Desempilha do topo (inicio)." },
+  { label: "size", documentation: "Quantidade de elementos." },
+  { label: "isEmpty", documentation: "Indica se esta vazio." },
+  { label: "clear", documentation: "Remove todos os elementos." },
+];
+
+const STACK_METHODS = [
+  { label: "push", documentation: "Empilha elemento." },
+  { label: "pop", documentation: "Remove e retorna topo." },
+  { label: "peek", documentation: "Consulta topo sem remover." },
+  { label: "empty", documentation: "Indica se pilha vazia." },
+  { label: "search", documentation: "Posicao de elemento na pilha." },
+  { label: "size", documentation: "Quantidade de elementos." },
+];
+
+const PRIORITY_QUEUE_METHODS = [
+  { label: "offer", documentation: "Insere no heap." },
+  { label: "add", documentation: "Insere no heap." },
+  { label: "poll", documentation: "Remove menor/maior elemento." },
+  { label: "peek", documentation: "Consulta topo do heap." },
+  { label: "remove", documentation: "Remove elemento especifico." },
+  { label: "size", documentation: "Quantidade de elementos." },
+  { label: "isEmpty", documentation: "Indica se esta vazio." },
+  { label: "clear", documentation: "Remove todos os elementos." },
+  { label: "comparator", documentation: "Retorna Comparator usado." },
+];
+
+const ARRAY_METHODS = [
+  {
+    label: "length",
+    documentation: "Tamanho do array.",
+    insertText: "length",
+    noParens: true,
+    kind: monaco.languages.CompletionItemKind.Property,
+  },
+  { label: "clone", documentation: "Copia rasa do array." },
+];
+
+const STRING_METHODS = [
+  { label: "length", documentation: "Tamanho da string." },
+  { label: "charAt", documentation: "Caractere na posicao informada." },
+  { label: "substring", documentation: "Subcadeia entre indices." },
+  { label: "indexOf", documentation: "Primeira ocorrencia do termo." },
+  { label: "lastIndexOf", documentation: "Ultima ocorrencia do termo." },
+  { label: "contains", documentation: "Verifica se contem trecho." },
+  { label: "startsWith", documentation: "Verifica prefixo." },
+  { label: "endsWith", documentation: "Verifica sufixo." },
+  { label: "toLowerCase", documentation: "Converte para minusculas." },
+  { label: "toUpperCase", documentation: "Converte para maiusculas." },
+  { label: "trim", documentation: "Remove espacos nas pontas." },
+  { label: "split", documentation: "Divide pela regex/delimitador." },
+  { label: "replace", documentation: "Substitui primeiro termo." },
+  { label: "replaceAll", documentation: "Substitui todas as ocorrencias." },
+  { label: "isEmpty", documentation: "Indica se string e vazia." },
+  { label: "equals", documentation: "Compara conteudo." },
+  { label: "equalsIgnoreCase", documentation: "Compara ignorando caixa." },
+  { label: "toCharArray", documentation: "Converte para array de chars." },
+];
+
+const STRING_BUILDER_METHODS = [
+  { label: "append", documentation: "Concatena valor ao final." },
+  { label: "insert", documentation: "Insere valor em indice." },
+  { label: "delete", documentation: "Remove intervalo." },
+  { label: "deleteCharAt", documentation: "Remove caractere na posicao." },
+  { label: "setCharAt", documentation: "Altera caractere na posicao." },
+  { label: "reverse", documentation: "Inverte conteudo." },
+  { label: "toString", documentation: "Converte para String." },
+  { label: "length", documentation: "Tamanho atual." },
+  { label: "charAt", documentation: "Caractere na posicao." },
+  { label: "setLength", documentation: "Ajusta tamanho." },
+  { label: "substring", documentation: "Subcadeia entre indices." },
+];
+
+const NUMBER_METHODS = [
+  { label: "intValue", documentation: "Valor como int." },
+  { label: "longValue", documentation: "Valor como long." },
+  { label: "doubleValue", documentation: "Valor como double." },
+  { label: "floatValue", documentation: "Valor como float." },
+  { label: "shortValue", documentation: "Valor como short." },
+  { label: "byteValue", documentation: "Valor como byte." },
+  { label: "compareTo", documentation: "Compara com outro valor." },
+  { label: "toString", documentation: "Converte para String." },
+  { label: "hashCode", documentation: "Hash do valor." },
+  { label: "equals", documentation: "Compara igualdade." },
+];
+
+const BOOLEAN_METHODS = [
+  { label: "booleanValue", documentation: "Valor booleano." },
+  { label: "compareTo", documentation: "Compara com outro boolean." },
+  { label: "toString", documentation: "Converte para String." },
+  { label: "hashCode", documentation: "Hash do valor." },
+  { label: "equals", documentation: "Compara igualdade." },
+];
+
+const CHAR_METHODS = [
+  { label: "charValue", documentation: "Valor char." },
+  { label: "compareTo", documentation: "Compara com outro char." },
+  { label: "toString", documentation: "Converte para String." },
+  { label: "hashCode", documentation: "Hash do valor." },
+  { label: "equals", documentation: "Compara igualdade." },
+];
+
+const OPTIONAL_METHODS = [
+  { label: "isPresent", documentation: "Indica se ha valor." },
+  { label: "isEmpty", documentation: "Indica se ausente." },
+  { label: "get", documentation: "Retorna valor ou lança excecao." },
+  { label: "orElse", documentation: "Valor ou padrao." },
+  { label: "orElseGet", documentation: "Valor ou supplier." },
+  { label: "orElseThrow", documentation: "Valor ou excecao." },
+  { label: "ifPresent", documentation: "Executa se presente." },
+  { label: "map", documentation: "Transforma valor." },
+  { label: "flatMap", documentation: "Transforma para outro Optional." },
+  { label: "filter", documentation: "Filtra por predicado." },
 ];
 
 function adjustSelectionToModel(selection, model) {
