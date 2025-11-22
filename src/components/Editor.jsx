@@ -285,6 +285,7 @@ export default function Editor({ code, onChange }) {
   const editorRef = useRef(null);
   const preventLoopRef = useRef(false);
   const lastSelectionRef = useRef(null);
+  const fontSizeRef = useRef(16);
 
   useEffect(() => {
     if (!containerRef.current || editorRef.current) {
@@ -300,6 +301,7 @@ export default function Editor({ code, onChange }) {
       minimap: { enabled: false },
       wordBasedSuggestions: false,
     });
+    fontSizeRef.current = editor.getOption(monaco.editor.EditorOption.fontSize);
 
     editorRef.current = editor;
 
@@ -322,7 +324,37 @@ export default function Editor({ code, onChange }) {
       onChange(editor.getValue());
     });
 
+    const handleWheel = (event) => {
+      const editorInstance = editorRef.current;
+      if (!editorInstance || !containerRef.current) return;
+      if (!containerRef.current.contains(event.target)) return;
+
+      if (!event.ctrlKey) {
+        return;
+      }
+
+      const delta = event.deltaY;
+      if (delta === 0) return;
+
+      const currentSize =
+        fontSizeRef.current ||
+        editorInstance.getOption(monaco.editor.EditorOption.fontSize) ||
+        16;
+      const direction = delta < 0 ? 1 : -1;
+      const nextSize = clamp(currentSize + direction, 10, 28);
+      if (nextSize !== currentSize) {
+        fontSizeRef.current = nextSize;
+        editorInstance.updateOptions({ fontSize: nextSize });
+      }
+
+      event.preventDefault();
+    };
+
+    const domNode = containerRef.current;
+    domNode.addEventListener("wheel", handleWheel, { passive: false });
+
     return () => {
+      domNode.removeEventListener("wheel", handleWheel);
       subscription.dispose();
       editor.dispose();
       editorRef.current = null;
@@ -897,4 +929,8 @@ function adjustSelectionToModel(selection, model) {
     end.lineNumber,
     end.column
   );
+}
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
 }
