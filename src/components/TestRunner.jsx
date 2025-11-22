@@ -4,12 +4,14 @@ import runJava from "../runtime/runJava";
 export default function TestRunner({ challenge, code }) {
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState("");
+  const [compileErrors, setCompileErrors] = useState([]);
   const [results, setResults] = useState([]);
   const [summary, setSummary] = useState(null);
 
   async function runTests() {
     setIsRunning(true);
     setError("");
+    setCompileErrors([]);
     setResults([]);
     setSummary(null);
 
@@ -21,6 +23,7 @@ export default function TestRunner({ challenge, code }) {
       const message =
         err?.message || "Nao foi possivel executar os testes agora.";
       setError(message);
+      setCompileErrors(err?.compileErrors || []);
     } finally {
       setIsRunning(false);
     }
@@ -38,7 +41,24 @@ export default function TestRunner({ challenge, code }) {
 
       {error && (
         <div className="mt-4 rounded border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
-          {error}
+          <p>{error}</p>
+          {compileErrors.length > 0 && (
+            <ul className="mt-2 space-y-1">
+              {compileErrors.map((item, index) => (
+                <li key={index} className="leading-snug">
+                  <span className="font-mono text-red-100">
+                    Linha {item.line}:
+                  </span>{" "}
+                  {item.hint || item.message}
+                  {item.code ? (
+                    <div className="text-xs text-red-100 mt-1 font-mono">
+                      {item.code.trim()}
+                    </div>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 

@@ -42,7 +42,14 @@ export default async function runJava(code, challenge) {
   const runData = data.run || {};
   const stderr = (runData.stderr || "").trim();
   if (stderr) {
-    throw new Error(stderr);
+    const compileErrors = parseCompilerErrors(stderr, code);
+    const primary =
+      compileErrors.length > 0
+        ? compileErrors[0].hint || compileErrors[0].message
+        : stderr;
+    const error = new Error(primary);
+    error.compileErrors = compileErrors;
+    throw error;
   }
 
   const stdout = runData.stdout || "";
@@ -258,6 +265,41 @@ function buildComparison(type, left, right) {
     return `${left} == ${right}`;
   }
   return `Objects.equals(${left}, ${right})`;
+}
+
+function parseCompilerErrors(stderr, originalUserCode) {
+  const errors = [];
+  const codeLines = (originalUserCode || "").split(/\r?\n/);
+  const regex = /^(?<file>[^:\n]+):(?<line>\d+):\s+error:\s+(?<message>.+)$/;
+
+  const lines = stderr.split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].match(regex);
+    if (!match || !match.groups) continue;
+
+    const lineNumber = Number(match.groups.line);
+    const message = match.groups.message.trim();
+    const code = codeLines[lineNumber - 1] || "";
+    const hint = buildHint(message, code);
+
+    errors.push({ line: lineNumber, message, code, hint });
+  }
+
+  return errors;
+}
+
+function buildHint(message, code) {
+  if (!code) return null;
+
+  const missingGeneric =
+    message.includes("'(' or '[' expected") &&
+    code.includes(">") &&
+    !code.includes("<");
+  if (missingGeneric) {
+    return "Falta '<' depois do tipo generico (ex.: ArrayList<>()).";
+  }
+
+  return null;
 }
 
 function parseRunnerOutput(stdout) {
