@@ -345,11 +345,29 @@ export default function Editor({ code, onChange }) {
         }
         event.preventDefault();
         event.stopPropagation();
+        return;
+      }
+
+      const scrollTop = editorInstance.getScrollTop();
+      const maxScroll =
+        editorInstance.getScrollHeight() -
+        editorInstance.getLayoutInfo().height;
+      const atTop = scrollTop <= 0;
+      const atBottom = scrollTop >= maxScroll - 1;
+      const scrollingUp = delta < 0;
+      const scrollingDown = delta > 0;
+
+      if ((scrollingUp && atTop) || (scrollingDown && atBottom)) {
+        // Deixa o default agir no container pai; evita que o Monaco capture e bloqueie.
+        event.stopPropagation();
       }
     };
 
     const domNode = containerRef.current;
-    domNode.addEventListener("wheel", handleWheel, { passive: false });
+    domNode.addEventListener("wheel", handleWheel, {
+      passive: false,
+      capture: true,
+    });
 
     return () => {
       domNode.removeEventListener("wheel", handleWheel);
