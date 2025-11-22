@@ -20,22 +20,28 @@ export default function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col h-screen bg-zinc-950">
       <TopBar
         javaVersion={JAVA_VERSION}
         onNextChallenge={goToNextChallenge}
         challengeTitle={challenge.title}
       />
-      <div className="grid grid-cols-2 flex-1">
-        <Editor code={code} onChange={setCode} />
-        <div className="flex flex-col">
+      <main className="flex-1 overflow-y-auto">
+        <div className="max-w-6xl mx-auto px-6 py-6 space-y-6">
           <ChallengePanel
             challenge={challenge}
             harnessDescription={HARNESS_DESCRIPTION}
           />
+
+          <div className="rounded border border-zinc-800 bg-zinc-900 shadow-lg">
+            <div className="h-[460px]">
+              <Editor code={code} onChange={setCode} />
+            </div>
+          </div>
+
           <TestRunner challenge={challenge} code={code} />
         </div>
-      </div>
+      </main>
     </div>
   );
 }

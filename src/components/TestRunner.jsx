@@ -30,7 +30,7 @@ export default function TestRunner({ challenge, code }) {
   }
 
   return (
-    <div className="p-4 bg-zinc-900 flex-1 overflow-y-auto">
+    <div className="p-4 bg-zinc-900 border border-zinc-800 rounded shadow">
       <button
         className="bg-blue-600 px-4 py-2 rounded disabled:opacity-50"
         onClick={runTests}
