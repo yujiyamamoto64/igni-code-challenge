@@ -344,21 +344,6 @@ export default function Editor({ code, onChange }) {
           editorInstance.updateOptions({ fontSize: nextSize });
         }
         event.preventDefault();
-        return;
-      }
-
-      const scrollTop = editorInstance.getScrollTop();
-      const maxScroll =
-        editorInstance.getScrollHeight() -
-        editorInstance.getLayoutInfo().height;
-      const atTop = scrollTop <= 0;
-      const atBottom = scrollTop >= maxScroll - 1;
-      const scrollingUp = delta < 0;
-      const scrollingDown = delta > 0;
-
-      if ((scrollingUp && atTop) || (scrollingDown && atBottom)) {
-        window.scrollBy({ top: delta, behavior: "auto" });
-        event.preventDefault();
       }
     };
 
