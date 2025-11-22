@@ -651,56 +651,78 @@ function inferTypeInfo(model, variableName) {
   const text = model.getValue();
   const escaped = escapeRegExp(variableName);
 
-  // Arrays (Type[] name or Type name[])
-  const arrayTypePattern = new RegExp(
-    `\\b([A-Za-z_][A-Za-z0-9_<>?,\\s]*)\\s*\\[\\s*\\]\\s+${escaped}\\b`
-  );
-  const arrayTypePatternAlt = new RegExp(
-    `\\b([A-Za-z_][A-Za-z0-9_<>?,\\s]*)\\s+${escaped}\\s*\\[\\s*\\]`
-  );
-  const arrayNewPattern = new RegExp(
-    `${escaped}\\s*=\\s*new\\s+([A-Za-z_][A-Za-z0-9_<>?,\\s]*)\\s*\\[`
-  );
-  const arrayMatch =
-    text.match(arrayTypePattern) ||
-    text.match(arrayTypePatternAlt) ||
-    text.match(arrayNewPattern);
-  if (arrayMatch) {
-    const elementType = normalizeTypeName(arrayMatch[1]);
-    return { kind: "array", elementKind: mapBaseTypeToKind(elementType) };
-  }
+  const matches = [];
 
-  // Generic types (List<String> list)
-  const genericDecl = new RegExp(
-    `\\b([A-Za-z_][A-Za-z0-9_]*)\\s*<[^;>]*>\\s+${escaped}\\b`
-  );
-  const genericMatch = text.match(genericDecl);
-  if (genericMatch) {
-    const baseType = normalizeTypeName(genericMatch[1]);
-    const kind = mapBaseTypeToKind(baseType);
-    if (kind) return { kind };
-  }
+  const collectLast = (regex, kindResolver, isArray = false) => {
+    let m;
+    while ((m = regex.exec(text))) {
+      matches.push({
+        index: m.index,
+        typeName: m[1],
+        isArray,
+        resolver: kindResolver,
+      });
+    }
+  };
 
-  // Simple declarations (Type var;)
-  const simpleDecl = new RegExp(
-    `\\b([A-Za-z_][A-Za-z0-9_]*)\\s+${escaped}\\b`
+  collectLast(
+    new RegExp(
+      `\\b([A-Za-z_][A-Za-z0-9_<>?,\\s]*)\\s*\\[\\s*\\]\\s+${escaped}\\b`,
+      "g"
+    ),
+    mapBaseTypeToKind,
+    true
   );
-  const simpleMatch = text.match(simpleDecl);
-  if (simpleMatch) {
-    const baseType = normalizeTypeName(simpleMatch[1]);
-    const kind = mapBaseTypeToKind(baseType);
-    if (kind) return { kind };
-  }
+  collectLast(
+    new RegExp(
+      `\\b([A-Za-z_][A-Za-z0-9_<>?,\\s]*)\\s+${escaped}\\s*\\[\\s*\\]`,
+      "g"
+    ),
+    mapBaseTypeToKind,
+    true
+  );
+  collectLast(
+    new RegExp(
+      `${escaped}\\s*=\\s*new\\s+([A-Za-z_][A-Za-z0-9_<>?,\\s]*)\\s*\\[`,
+      "g"
+    ),
+    mapBaseTypeToKind,
+    true
+  );
 
-  // Assignment with new (var = new Type())
-  const newAssign = new RegExp(
-    `${escaped}\\s*=\\s*new\\s+([A-Za-z_][A-Za-z0-9_]*)`
+  collectLast(
+    new RegExp(
+      `\\b([A-Za-z_][A-Za-z0-9_]*)\\s*<[^;>]*>\\s+${escaped}\\b`,
+      "g"
+    ),
+    mapBaseTypeToKind,
+    false
   );
-  const newAssignMatch = text.match(newAssign);
-  if (newAssignMatch) {
-    const baseType = normalizeTypeName(newAssignMatch[1]);
-    const kind = mapBaseTypeToKind(baseType);
-    if (kind) return { kind };
+
+  collectLast(
+    new RegExp(`\\b([A-Za-z_][A-Za-z0-9_]*)\\s+${escaped}\\b`, "g"),
+    mapBaseTypeToKind,
+    false
+  );
+
+  collectLast(
+    new RegExp(`${escaped}\\s*=\\s*new\\s+([A-Za-z_][A-Za-z0-9_]*)`, "g"),
+    mapBaseTypeToKind,
+    false
+  );
+
+  if (matches.length > 0) {
+    const last = matches.reduce((acc, cur) =>
+      !acc || cur.index > acc.index ? cur : acc
+    );
+    const baseType = normalizeTypeName(last.typeName);
+    const kind = last.resolver(baseType);
+    if (last.isArray && kind) {
+      return { kind: "array", elementKind: kind };
+    }
+    if (kind) {
+      return { kind };
+    }
   }
 
   return null;
