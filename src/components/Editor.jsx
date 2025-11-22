@@ -329,25 +329,37 @@ export default function Editor({ code, onChange }) {
       if (!editorInstance || !containerRef.current) return;
       if (!containerRef.current.contains(event.target)) return;
 
-      if (!event.ctrlKey) {
-        return;
-      }
-
       const delta = event.deltaY;
       if (delta === 0) return;
 
-      const currentSize =
-        fontSizeRef.current ||
-        editorInstance.getOption(monaco.editor.EditorOption.fontSize) ||
-        16;
-      const direction = delta < 0 ? 1 : -1;
-      const nextSize = clamp(currentSize + direction, 10, 28);
-      if (nextSize !== currentSize) {
-        fontSizeRef.current = nextSize;
-        editorInstance.updateOptions({ fontSize: nextSize });
+      if (event.ctrlKey) {
+        const currentSize =
+          fontSizeRef.current ||
+          editorInstance.getOption(monaco.editor.EditorOption.fontSize) ||
+          16;
+        const direction = delta < 0 ? 1 : -1;
+        const nextSize = clamp(currentSize + direction, 10, 28);
+        if (nextSize !== currentSize) {
+          fontSizeRef.current = nextSize;
+          editorInstance.updateOptions({ fontSize: nextSize });
+        }
+        event.preventDefault();
+        return;
       }
 
-      event.preventDefault();
+      const scrollTop = editorInstance.getScrollTop();
+      const maxScroll =
+        editorInstance.getScrollHeight() -
+        editorInstance.getLayoutInfo().height;
+      const atTop = scrollTop <= 0;
+      const atBottom = scrollTop >= maxScroll - 1;
+      const scrollingUp = delta < 0;
+      const scrollingDown = delta > 0;
+
+      if ((scrollingUp && atTop) || (scrollingDown && atBottom)) {
+        window.scrollBy({ top: delta, behavior: "auto" });
+        event.preventDefault();
+      }
     };
 
     const domNode = containerRef.current;
