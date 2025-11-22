@@ -470,8 +470,9 @@ function getMathContext(model, position) {
 }
 
 function getPropertyContext(model, position) {
-  const lineContent = model.getLineContent(position.lineNumber);
-  const textUntilPosition = lineContent.slice(0, position.column - 1);
+  const textUntilPosition = model.getValueInRange(
+    new monaco.Range(position.lineNumber, 1, position.lineNumber, position.column)
+  );
   const match = textUntilPosition.match(
     /([A-Za-z_][A-Za-z0-9_]*\s*(?:\[[^\]]*\])?)\s*\.\s*([A-Za-z0-9_]*)$/
   );
