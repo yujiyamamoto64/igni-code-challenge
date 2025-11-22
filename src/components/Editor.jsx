@@ -298,6 +298,7 @@ export default function Editor({ code, onChange }) {
       fontSize: 16,
       automaticLayout: true,
       minimap: { enabled: false },
+      wordBasedSuggestions: false,
     });
 
     editorRef.current = editor;
@@ -337,7 +338,21 @@ export default function Editor({ code, onChange }) {
           return { suggestions: buildMathSuggestions(mathContext.range) };
         }
 
-        if (isPropertyAccess(model, position)) {
+        const propertyContext = getPropertyContext(model, position);
+        if (propertyContext) {
+          const { variable, partial } = propertyContext;
+          const inferredType = inferTypeForVariable(model, variable);
+          const range = {
+            startLineNumber: position.lineNumber,
+            startColumn: position.column - partial.length,
+            endLineNumber: position.lineNumber,
+            endColumn: position.column,
+          };
+
+          if (inferredType === "list") {
+            return { suggestions: buildListMethodSuggestions(range) };
+          }
+
           return { suggestions: [] };
         }
 
@@ -398,10 +413,14 @@ function getMathContext(model, position) {
   };
 }
 
-function isPropertyAccess(model, position) {
+function getPropertyContext(model, position) {
   const lineContent = model.getLineContent(position.lineNumber);
   const textUntilPosition = lineContent.slice(0, position.column - 1);
-  return /\.\s*[A-Za-z0-9_]*$/.test(textUntilPosition);
+  const match = textUntilPosition.match(
+    /([A-Za-z_][A-Za-z0-9_]*)\s*\.\s*([A-Za-z0-9_]*)$/
+  );
+  if (!match) return null;
+  return { variable: match[1], partial: match[2] || "" };
 }
 
 function buildMathSuggestions(range) {
@@ -421,6 +440,17 @@ function buildGeneralSuggestions(range) {
     ...SNIPPET_SUGGESTIONS.map(withRange),
     ...LIBRARY_KEYWORDS.map(withRange),
   ];
+}
+
+function buildListMethodSuggestions(range) {
+  return LIST_METHODS.map(({ label, documentation }) => ({
+    label,
+    kind: monaco.languages.CompletionItemKind.Method,
+    insertText: `${label}($0)`,
+    detail: "java.util.List",
+    documentation,
+    range,
+  }));
 }
 
 function insertImports(editor, imports) {
@@ -452,6 +482,54 @@ function findImportInsertLine(model) {
   }
   return lineNumber;
 }
+
+function inferTypeForVariable(model, variableName) {
+  const text = model.getValue();
+  const escaped = escapeRegExp(variableName);
+  const listTypePattern = new RegExp(
+    `\\b(List|ArrayList|LinkedList)\\s*(<[^;\\n>]*>)?\\s+${escaped}\\b`
+  );
+  const listNewPattern = new RegExp(
+    `${escaped}\\s*=\\s*new\\s+(ArrayList|LinkedList)\\b`
+  );
+
+  if (listTypePattern.test(text) || listNewPattern.test(text)) {
+    return "list";
+  }
+
+  return null;
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+const LIST_METHODS = [
+  { label: "add", documentation: "Adiciona um elemento." },
+  {
+    label: "addAll",
+    documentation: "Adiciona todos os elementos de outra colecao.",
+  },
+  { label: "get", documentation: "Retorna o elemento no indice informado." },
+  { label: "set", documentation: "Substitui o elemento no indice." },
+  { label: "remove", documentation: "Remove por indice ou objeto." },
+  {
+    label: "removeIf",
+    documentation: "Remove elementos que atendem ao predicado.",
+  },
+  { label: "size", documentation: "Quantidade de elementos na lista." },
+  { label: "isEmpty", documentation: "Indica se a lista esta vazia." },
+  { label: "clear", documentation: "Remove todos os elementos." },
+  { label: "contains", documentation: "Verifica se um elemento esta presente." },
+  { label: "indexOf", documentation: "Primeira posicao de um elemento." },
+  { label: "lastIndexOf", documentation: "Ultima posicao de um elemento." },
+  { label: "subList", documentation: "Retorna uma visao parcial da lista." },
+  { label: "sort", documentation: "Ordena a lista com Comparator." },
+  { label: "toArray", documentation: "Converte para array." },
+  { label: "iterator", documentation: "Retorna um Iterator." },
+  { label: "listIterator", documentation: "Retorna um ListIterator." },
+  { label: "stream", documentation: "Retorna um Stream." },
+];
 
 function adjustSelectionToModel(selection, model) {
   const clampPosition = (position) => {
