@@ -344,6 +344,7 @@ export default function Editor({ code, onChange }) {
           editorInstance.updateOptions({ fontSize: nextSize });
         }
         event.preventDefault();
+        event.stopPropagation();
       }
     };
 
